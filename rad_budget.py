@@ -2,10 +2,6 @@ from __future__ import division
 import numpy as np
 import pdb
 
-
-# Assumptions about the input data.
-#  - All data is the time mean and zonal mean. 
-
 class EnergyBudget():
 
     def __init__(self):
@@ -103,7 +99,7 @@ class EnergyBudget():
         crf_surf = data['lwds'] - data_clear_sky['lwds'] + data['swds'] - data_clear_sky['swds']
 
         #    - at the top of atmosphere
-        crf_toa  = data['lwut'] - data_clear_sky['lwut'] + data['swut'] - data_clear_sky['swut']
+        crf_toa  = data_clear_sky['lwut'] - data['lwut'] + data_clear_sky['swut'] - data['swut']
 
         cre = crf_toa - crf_surf + data['swus'] - data_clear_sky['swus']
 
