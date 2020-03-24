@@ -2,6 +2,19 @@ from __future__ import division
 import numpy as np
 import pdb
 
+def area_weight_avg(data, lat, lat_axis):
+    #this is only needed as a test and not applied to any data
+    return np.average(data, weights=np.cos(np.radians(lat)),
+                          axis=lat_axis)
+
+def area_weight_data(data, lat):
+
+
+    weights = np.cos(np.radians(lat))
+    data_weighted = data * weights
+    #avg_data = np.sum(data * weights) / np.sum(weights)
+    return data_weighted
+
 class EnergyBudget():
 
     def __init__(self):
@@ -18,17 +31,16 @@ class EnergyBudget():
             pl: precip * L (budget output not input data)
             sh: sensible heat
            cre: cloud radiative effect
-           crf: cloud radiative forcing
     
         List of papers
         --------------
             Flux equations:
-               DeAngelis et al. 2015: An observational radiative constraint 
-                                      on hydrologic cycle intensification
+                DeAngelis et al. 2015: An observational radiative constraint 
+                                       on hydrologic cycle intensification
             CRE equation:
-              Miller et al 2011: The Radiation Budget of the West African Sahel
-                                 and Its Controls: A Perspective from Observations
-                                 and Global Climate Models
+                Allen 2011 "Combining satellite data and models to estimate cloud
+                            radiative effect at the surface and in the atmosphere"  
+
         """
 
         self.flux_names     = ['lwds', 'lwut', 'lwus',
@@ -36,10 +48,6 @@ class EnergyBudget():
 
         self.budget_terms   = ['swa', 'pl', 'lwc', 'sh'] 
 
-    def area_weight_avg(self, data, lat, lat_axis):
-        #this is only needed as a test and not applied to any data
-        return np.average(data, weights=np.cos(np.radians(lat)),
-                          axis=lat_axis).mean()
 
     def compute_radiation_budget(self, data):
         """
@@ -68,41 +76,68 @@ class EnergyBudget():
         pl = ( lwc - swa - data['sh'] )  #units are #W/m2
 
         #testing magnitude
-        rad_loss_space = ( - self.area_weight_avg(data['lwut'],data['lat'], lat_axis=0)
-                           + self.area_weight_avg(data['swdt'],data['lat'], lat_axis=0)
-                           - self.area_weight_avg(data['swut'],data['lat'], lat_axis=0) )
+        rad_loss_space = ( - area_weight_avg(data['lwut'],data['lat'], lat_axis=0)
+                           + area_weight_avg(data['swdt'],data['lat'], lat_axis=0)
+                           - area_weight_avg(data['swut'],data['lat'], lat_axis=0) )
     
         output = {'lwc':lwc, 'swa':swa, 'pl':pl}  
 
         return output 
 
-    def compute_cre(self, data, data_clear_sky):
+    def compute_cre(self, data_all_sky, data_clear_sky):
         """
         Compute the cloud radiative effect
 
         Parameters
         ----------
-        data : dictionary of data with keys:  [self.flux_names, lat]
-               Each dictionary element is the time mean, zonal mean and is a 
-               1D array of shate latitude.
-               Fluxes are all-sky (all sky = clear-sky + cloudy-sky) 
-        data : as in data, but for clear-sky fluxes
+            data_all_sky : dict keys are self.flux_names and lat
+                           each dict element is time mean and zonal mean
+                           each dict element is a 1D array of shape latitude.
+            data_clear_sky : as above but for clear-sky fluxes
 
         Returns
         -------
-        output : a dictionary with keys: crf_s, crf_t, cre
+            output : a dictionary with each of the computed componets
+
+
+        Balance values:
+        -------
+
+            IPCC AR5 Chapter 7 p 580 global average (TOA)
+                SWCRE = -50 W/m2
+                LWCRE = +30 W/m2
+                CRE   = -20 W/m2 (ie the net effect of clouds is a cooling)
+
+        Notes:
+        -------
+          - we have for a long time computed CRE at TOA. Improvements in 
+            remote sensing has made it possible to estimate the surface CRE
+            and hence within the atmosphere.
+          - cloud forcing  F = LWF - SWF (the sign depends on how you define the fluxes)
+          - all sky forcing = cloudy sky forcing + clear sky forcing
+          - cloud radiatve effect (CRE) and cloud radiative forcing (CRF) are used interchangeably
 
         """
+        
+        #TOA CRE 
+        lwcre = data_clear_sky['lwut'] - data_all_sky['lwut']
+        swcre = data_clear_sky['swut'] - data_all_sky['swut']
+        cre  = lwcre - swcre 
 
-        # compute the cloud radiative forcing:
-        #    - at the surface
-        crf_surf = data['lwds'] - data_clear_sky['lwds'] + data['swds'] - data_clear_sky['swds']
+        #surf CRE
+        lwcre_surf = data_all_sky['lwds'] - data_clear_sky['lwds'] -
+                     data_all_sky['lwus'] + data_clear_sky['lwus'] 
+        swcre_surf = data_all_sky['swds'] - data_clear_sky['swds'] - 
+                     data_all_sky['swus'] + data_clear_sky['swus']
+        cre_surf   = lwcre_surf - swcre_surf
 
-        #    - at the top of atmosphere
-        crf_toa  = data_clear_sky['lwut'] - data['lwut'] + data_clear_sky['swut'] - data['swut']
+        #atmospheric CRE 
+        alwcre =  lwcre - lwcre_surf
+        aswcre =  swcre - swcre_surf
+        acre   = alwcre - aswcre
 
-        cre = crf_toa - crf_surf + data['swus'] - data_clear_sky['swus']
-
-        output = {'crf_s':crf_surf, 'crf_t':crf_toa, 'cre':cre}
+        output = {'lwcre':lwcre,'swcre':swcre,'cre':cre, #TOA
+                  'lwcre_surf':lwcre_surf,'swcre_surf':swcre_surf,'cre_surf':cre_surf, #surf
+                   'alwcre':alwcre,'aswcre':aswcre,'acre':acre} #atmosphere
 
         return output
