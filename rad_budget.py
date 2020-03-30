@@ -9,9 +9,14 @@ def area_weight_avg(data, lat, lat_axis):
 
 def area_weight_data(data, lat):
 
-
     weights = np.cos(np.radians(lat))
-    data_weighted = data * weights
+    if len(data.shape) == 1:        
+        data_weighted = data * weights
+    elif len(data.shape) ==2:
+        data_weighted = data * weights[:,None]
+    else:
+        print('Check dimension of data')
+        pdb.set_trace()
     #avg_data = np.sum(data * weights) / np.sum(weights)
     return data_weighted
 
@@ -118,26 +123,39 @@ class EnergyBudget():
           - cloud radiatve effect (CRE) and cloud radiative forcing (CRF) are used interchangeably
 
         """
-        
+
         #TOA CRE 
         lwcre = data_clear_sky['lwut'] - data_all_sky['lwut']
         swcre = data_clear_sky['swut'] - data_all_sky['swut']
-        cre  = lwcre - swcre 
+        cre  = lwcre + swcre 
 
         #surf CRE
-        lwcre_surf = data_all_sky['lwds'] - data_clear_sky['lwds'] -
-                     data_all_sky['lwus'] + data_clear_sky['lwus'] 
-        swcre_surf = data_all_sky['swds'] - data_clear_sky['swds'] - 
-                     data_all_sky['swus'] + data_clear_sky['swus']
-        cre_surf   = lwcre_surf - swcre_surf
+        lwcre_surf = (data_all_sky['lwds'] - data_clear_sky['lwds'] -
+                      data_all_sky['lwus'] + data_clear_sky['lwus']) 
+        swcre_surf = (data_all_sky['swds'] - data_clear_sky['swds'] - 
+                      data_all_sky['swus'] + data_clear_sky['swus'])
+        cre_surf   = lwcre_surf + swcre_surf
 
         #atmospheric CRE 
         alwcre =  lwcre - lwcre_surf
         aswcre =  swcre - swcre_surf
-        acre   = alwcre - aswcre
+        acre   = alwcre + aswcre
 
         output = {'lwcre':lwcre,'swcre':swcre,'cre':cre, #TOA
                   'lwcre_surf':lwcre_surf,'swcre_surf':swcre_surf,'cre_surf':cre_surf, #surf
                    'alwcre':alwcre,'aswcre':aswcre,'acre':acre} #atmosphere
 
         return output
+    
+    def global_avg_cre(self, cre, lat):
+
+        print_values = True
+        global_cre = {}
+        for var in cre.keys():
+            weighted_lat = area_weight_data(cre[var], lat)
+            global_cre[var] = weighted_lat.mean()
+            if print_values:
+                print('Global CRE for {} is: {:8.2f}'.format(var,global_cre[var]))
+        
+        
+        return global_cre
