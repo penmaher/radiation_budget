@@ -2,6 +2,8 @@ from __future__ import division
 import numpy as np
 import pdb
 
+__author__ = 'Penelope Maher'
+
 def area_weight_avg(data, lat, lat_axis):
     #this is only needed as a test and not applied to any data
     return np.average(data, weights=np.cos(np.radians(lat)),
