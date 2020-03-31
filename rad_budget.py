@@ -87,7 +87,7 @@ class EnergyBudget():
                            + area_weight_avg(data['swdt'],data['lat'], lat_axis=0)
                            - area_weight_avg(data['swut'],data['lat'], lat_axis=0) )
     
-        output = {'lwc':lwc, 'swa':swa, 'pl':pl}  
+        output = {'lwc':lwc, 'swa':swa, 'pl':pl, 'sh':data['sh']}  
 
         return output 
 
@@ -159,5 +159,13 @@ class EnergyBudget():
             if print_values:
                 print('Global CRE for {} is: {:8.2f}'.format(var,global_cre[var]))
         
-        
         return global_cre
+
+    def global_atmos_budget(self, budget, lat):
+        budget_weighted = {}
+        for var in ['pl', 'lwc', 'swa', 'sh']:
+            weighted_lat = area_weight_data(budget[var], lat) 
+            budget_weighted[var] = weighted_lat.mean()
+            print('Global energy budget {} is: {:8.2f}'.format(var,budget_weighted[var]))
+
+        return budget_weighted
