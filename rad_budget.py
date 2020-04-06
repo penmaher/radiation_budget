@@ -1,6 +1,7 @@
 from __future__ import division
 import numpy as np
 import pdb
+from scipy import integrate
 
 __author__ = 'Penelope Maher'
 
@@ -22,6 +23,15 @@ def area_weight_data(data, lat):
     #avg_data = np.sum(data * weights) / np.sum(weights)
     return data_weighted
 
+def calc_global_mean(data, lat):
+        
+    lat_rad = np.deg2rad(lat)
+    weights = np.cos(lat_rad)
+    area_weight     = integrate.trapz(weights,lat_rad)
+    global_integral = integrate.trapz(data * weights, lat_rad)
+    
+    return global_integral / area_weight
+
 class EnergyBudget():
 
     def __init__(self):
@@ -35,7 +45,7 @@ class EnergyBudget():
            t,s: top of atmosphere and surface
            swa: shortwave absorption
            lwc: longwave cooling
-            pl: precip * L (budget output not input data)
+            pl: precip * L
             sh: sensible heat
            cre: cloud radiative effect
     
@@ -53,8 +63,9 @@ class EnergyBudget():
         self.flux_names     = ['lwds', 'lwut', 'lwus',
                                'swus', 'swut', 'swds', 'swdt']
 
-        self.budget_terms   = ['swa', 'pl', 'lwc', 'sh'] 
+        self.other_names     = ['sh','precip'] #w/m2 
 
+        self.budget_terms   = ['swa', 'pl', 'lwc', 'sh','net'] 
 
     def compute_radiation_budget(self, data):
         """
@@ -79,15 +90,17 @@ class EnergyBudget():
         # net sw absorbed by atmosphere
         swa = (data['swdt'] - data['swut']) - (data['swds'] - data['swus']) 
 
-        # lwc is the biggest term by far
-        pl = ( lwc - swa - data['sh'] )  #units are #W/m2
+        pl = data['p']
+
+        #lwc-swa = p*l (ie lh) + sh
+        net = lwc - swa  - pl - data['sh']  #units are #W/m2
 
         #testing magnitude
         rad_loss_space = ( - area_weight_avg(data['lwut'],data['lat'], lat_axis=0)
                            + area_weight_avg(data['swdt'],data['lat'], lat_axis=0)
                            - area_weight_avg(data['swut'],data['lat'], lat_axis=0) )
-    
-        output = {'lwc':lwc, 'swa':swa, 'pl':pl, 'sh':data['sh']}  
+
+        output = {'lwc':lwc, 'swa':swa, 'pl':pl, 'sh':data['sh'], 'net':net}  
 
         return output 
 
@@ -162,10 +175,12 @@ class EnergyBudget():
         return global_cre
 
     def global_atmos_budget(self, budget, lat):
-        budget_weighted = {}
-        for var in ['pl', 'lwc', 'swa', 'sh']:
-            weighted_lat = area_weight_data(budget[var], lat) 
-            budget_weighted[var] = weighted_lat.mean()
-            print('Global energy budget {} is: {:8.2f}'.format(var,budget_weighted[var]))
+        global_budget = {}
+        for var in ['pl', 'lwc', 'swa', 'sh', 'net']:
+            #weighted_lat = area_weight_data(budget[var], lat) 
+            #budget_weighted[var] = weighted_lat.mean()
+            #print('Global energy budget {} is: {:8.2f}'.format(var,budget_weighted[var]))
+            global_budget[var] = calc_global_mean(budget[var], lat)
+            print('Global energy budget {} is: {:8.2f}'.format(var,global_budget[var]))
 
-        return budget_weighted
+        return global_budget
