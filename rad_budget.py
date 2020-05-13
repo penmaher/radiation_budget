@@ -55,7 +55,7 @@ class EnergyBudget():
                 DeAngelis et al. 2015: An observational radiative constraint 
                                        on hydrologic cycle intensification
             CRE equation:
-                Allen 2011 "Combining satellite data and models to estimate cloud
+                Allan 2011 "Combining satellite data and models to estimate cloud
                             radiative effect at the surface and in the atmosphere"  
 
         """
