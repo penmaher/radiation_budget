@@ -25,8 +25,8 @@ def area_weight_data(data, lat):
 
 def calc_global_mean(data, lat):
         
-    lat_rad = np.deg2rad(lat)
-    weights = np.cos(lat_rad)
+    lat_rad         = np.deg2rad(lat)
+    weights         = np.cos(lat_rad)
     area_weight     = integrate.trapz(weights,lat_rad)
     global_integral = integrate.trapz(data * weights, lat_rad)
     
