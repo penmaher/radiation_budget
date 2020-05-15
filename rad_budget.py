@@ -189,10 +189,27 @@ class EnergyBudget():
         
         return global_cre
 
+    def global_avg_cre_comp(self, data_all_sky, data_clear_sky):
+        '''Compute the global average of the CRE components.'''
+
+        cre_output  = self.compute_cre(data_all_sky, data_clear_sky)
+        glb_cre_comp = self.global_avg_cre(cre_output, data_all_sky['lat'])
+
+        return glb_cre_comp
+
     def global_atmos_budget(self, budget, lat):
-        global_budget = {}
+
         for var in ['pl', 'lwc', 'swa', 'sh', 'net']:
             global_budget[var] = calc_global_mean(budget[var], lat)
             print('Global energy budget {} is: {:8.2f}'.format(var,global_budget[var]))
 
         return global_budget
+
+    def global_avg_flux_comp(self, data, lat):
+
+        global_flux_comp = {}
+        for var in ['lwut', 'lwus', 'lwds', 'swut', 'swdt', 'swus', 'swds']:
+            global_flux_comp[var] = calc_global_mean(data[var], lat)
+
+        return global_flux_comp
+
