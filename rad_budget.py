@@ -199,6 +199,7 @@ class EnergyBudget():
 
     def global_atmos_budget(self, budget, lat):
 
+        global_budget = {}
         for var in ['pl', 'lwc', 'swa', 'sh', 'net']:
             global_budget[var] = calc_global_mean(budget[var], lat)
             print('Global energy budget {} is: {:8.2f}'.format(var,global_budget[var]))
