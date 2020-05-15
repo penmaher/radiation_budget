@@ -6,13 +6,19 @@ from scipy import integrate
 __author__ = 'Penelope Maher'
 
 def area_weight_avg(data, lat, lat_axis):
-    #this is only needed as a test and not applied to any data
-    return np.average(data, weights=np.cos(np.radians(lat)),
+    '''Only use this for testing or plotting. This is a rough test. 
+       Use calc_global_mean instead'''
+
+    weights = np.cos(np.radians(lat))
+
+    return np.average(data, weights=weights,
                           axis=lat_axis)
 
 def area_weight_data(data, lat):
+    '''Used for plotting '''
 
     weights = np.cos(np.radians(lat))
+
     if len(data.shape) == 1:        
         data_weighted = data * weights
     elif len(data.shape) ==2:
@@ -20,13 +26,22 @@ def area_weight_data(data, lat):
     else:
         print('Check dimension of data')
         pdb.set_trace()
+
     #avg_data = np.sum(data * weights) / np.sum(weights)
     return data_weighted
 
 def calc_global_mean(data, lat):
+    '''Why integrate to find an average?
+       The average is a course integral. It is more accurate to
+       take the integral than to 'brute force' it with an average.
+       The avergae will be smaller unless dlat is infinitly small.'''
         
     lat_rad         = np.deg2rad(lat)
+
+    # area weight the latitude to account for differences in latitude 
     weights         = np.cos(lat_rad)
+
+    # find the weights and then integrate
     area_weight     = integrate.trapz(weights,lat_rad)
     global_integral = integrate.trapz(data * weights, lat_rad)
     
@@ -48,6 +63,9 @@ class EnergyBudget():
             pl: precip * L
             sh: sensible heat
            cre: cloud radiative effect
+        Units
+        --------------
+        All input data should be fluxes (including precip). All units are W/m2
     
         List of papers
         --------------
@@ -63,7 +81,7 @@ class EnergyBudget():
         self.flux_names     = ['lwds', 'lwut', 'lwus',
                                'swus', 'swut', 'swds', 'swdt']
 
-        self.other_names     = ['sh','precip'] #w/m2 
+        self.other_names     = ['sh','precip']
 
         self.budget_terms   = ['swa', 'pl', 'lwc', 'sh','net'] 
 
@@ -93,9 +111,9 @@ class EnergyBudget():
         pl = data['p']
 
         #lwc-swa = p*l (ie lh) + sh
-        net = lwc - swa  - pl - data['sh']  #units are #W/m2
+        net = lwc - swa  - pl - data['sh'] 
 
-        #testing magnitude
+        #testing magnitude - not nedded otherwise
         rad_loss_space = ( - area_weight_avg(data['lwut'],data['lat'], lat_axis=0)
                            + area_weight_avg(data['swdt'],data['lat'], lat_axis=0)
                            - area_weight_avg(data['swut'],data['lat'], lat_axis=0) )
@@ -164,22 +182,16 @@ class EnergyBudget():
     
     def global_avg_cre(self, cre, lat):
 
-        print_values = True
         global_cre = {}
         for var in cre.keys():
-            weighted_lat = area_weight_data(cre[var], lat)
-            global_cre[var] = weighted_lat.mean()
-            if print_values:
-                print('Global CRE for {} is: {:8.2f}'.format(var,global_cre[var]))
+            global_cre[var] = calc_global_mean(cre[var], lat)            
+            print('Global CRE for {} is: {:8.2f}'.format(var,global_cre[var]))
         
         return global_cre
 
     def global_atmos_budget(self, budget, lat):
         global_budget = {}
         for var in ['pl', 'lwc', 'swa', 'sh', 'net']:
-            #weighted_lat = area_weight_data(budget[var], lat) 
-            #budget_weighted[var] = weighted_lat.mean()
-            #print('Global energy budget {} is: {:8.2f}'.format(var,budget_weighted[var]))
             global_budget[var] = calc_global_mean(budget[var], lat)
             print('Global energy budget {} is: {:8.2f}'.format(var,global_budget[var]))
 
