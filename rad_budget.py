@@ -111,7 +111,7 @@ class EnergyBudget():
         pl = data['p']
 
         #lwc-swa = p*l (ie lh) + sh
-        net = lwc - swa  - pl - data['sh'] 
+        net = - lwc + swa  + pl + data['sh'] 
 
         #testing magnitude - not nedded otherwise
         rad_loss_space = ( - area_weight_avg(data['lwut'],data['lat'], lat_axis=0)
