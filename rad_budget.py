@@ -87,7 +87,7 @@ class EnergyBudget():
 
     def compute_radiation_budget(self, data):
         """
-        Compute the radiatve budget
+        Compute the Atmospheric energy budget
 
         Parameters
         ----------
@@ -154,6 +154,7 @@ class EnergyBudget():
           - cloud forcing  F = LWF - SWF (the sign depends on how you define the fluxes)
           - all sky forcing = cloudy sky forcing + clear sky forcing
           - cloud radiatve effect (CRE) and cloud radiative forcing (CRF) are used interchangeably
+          - cre, cre_suf, and acre can be validated against Allan 2011 Fig 5. (see ref above)
 
         """
 
@@ -184,7 +185,7 @@ class EnergyBudget():
 
         global_cre = {}
         for var in cre.keys():
-            global_cre[var] = calc_global_mean(cre[var], lat)            
+            global_cre[var] = calc_global_mean(cre[var], lat)    
             print('Global CRE for {} is: {:8.2f}'.format(var,global_cre[var]))
         
         return global_cre
