@@ -69,7 +69,7 @@ class EnergyBudget():
     
         List of papers
         --------------
-            Flux equations:
+            Energy budget equations:
                 DeAngelis et al. 2015: An observational radiative constraint 
                                        on hydrologic cycle intensification
             CRE equation:
@@ -85,7 +85,7 @@ class EnergyBudget():
 
         self.budget_terms   = ['swa', 'pl', 'lwc', 'sh','net'] 
 
-    def compute_radiation_budget(self, data):
+    def compute_energy_budget(self, data):
         """
         Compute the Atmospheric energy budget
 
@@ -108,17 +108,16 @@ class EnergyBudget():
         # net sw absorbed by atmosphere
         swa = (data['swdt'] - data['swut']) - (data['swds'] - data['swus']) 
 
-        pl = data['p']
-
         #lwc-swa = p*l (ie lh) + sh
-        net =  lwc - swa  - pl - data['sh'] 
+        #net =  lwc - swa  - data['p'] - data['sh']  The form in Deangelis 2015 is 
+        # not consistent with the totoal atmospheric forcing code below (ref pending)
 
         #testing magnitude - not nedded otherwise
         rad_loss_space = ( - area_weight_avg(data['lwut'],data['lat'], lat_axis=0)
                            + area_weight_avg(data['swdt'],data['lat'], lat_axis=0)
                            - area_weight_avg(data['swut'],data['lat'], lat_axis=0) )
 
-        output = {'lwc':lwc, 'swa':swa, 'pl':pl, 'sh':data['sh'], 'net':net}  
+        output = {'lwc':lwc, 'swa':swa, 'pl':data['p'], 'sh':data['sh']}  
 
         return output 
 
@@ -158,19 +157,19 @@ class EnergyBudget():
 
         """
 
-        #TOA CRE 
+        #TOA CRE all sky
         lwcre = data_clear_sky['lwut'] - data_all_sky['lwut']
         swcre = data_clear_sky['swut'] - data_all_sky['swut']
         cre  = lwcre + swcre 
 
-        #surf CRE
-        lwcre_surf = (data_all_sky['lwds'] - data_clear_sky['lwds'] -
-                      data_all_sky['lwus'] + data_clear_sky['lwus']) 
-        swcre_surf = (data_all_sky['swds'] - data_clear_sky['swds'] - 
-                      data_all_sky['swus'] + data_clear_sky['swus'])
+        #surf CRE all sky
+        lwcre_surf = (data_all_sky['lwds'] - data_clear_sky['lwds'] 
+                     -data_all_sky['lwus'] + data_clear_sky['lwus']) 
+        swcre_surf = (data_all_sky['swds'] - data_clear_sky['swds'] 
+                     -data_all_sky['swus'] + data_clear_sky['swus'])
         cre_surf   = lwcre_surf + swcre_surf
 
-        #atmospheric CRE 
+        #atmospheric CRE all sky 
         alwcre =  lwcre - lwcre_surf
         aswcre =  swcre - swcre_surf
         acre   = alwcre + aswcre
@@ -180,7 +179,49 @@ class EnergyBudget():
                    'alwcre':alwcre,'aswcre':aswcre,'acre':acre} #atmosphere
 
         return output
-    
+
+    def total_atmos_forcing(self, data_all_sky, data_clear_sky, data_budget):    
+
+        # get the cloud forcing
+        cre_output = self.compute_cre(data_all_sky, data_clear_sky)
+
+        #get the clear sky forcing
+        cs_forcing =  atm_cs_forcing(self, data_all_sky, data_clear_sky)
+
+        #atmos forcing = toa forcing - surface forcing
+        atm_sw_crf_cld = output['swcre'] - output['swcre_surf']
+        atm_sw_crf_cs  = cs_forcing['swcre'] - cs_forcing['swcre_surf']
+        #atmospheric all sky sw forcing
+        atm_sw_crf     = atm_sw_crf_cld + atm_sw_crf_cs
+
+        atm_lw_crf_cld = output['lwcre'] - output['lwcre_surf']
+        atm_lw_crf_cs  = cs_forcing['lwcre'] - cs_forcing['lwcre_surf']
+        #atmospheric all sky lw forcing
+        atm_lw_crf     = atm_lw_crf_cld + atm_lw_crf_cs 
+
+        #total = cre - cre_surf + PL + SH
+        total_forcing = cre_output['cre'] - cre_output['cre_surf'] + data['p'] + data['sh']
+
+        forcing = {'sw_crf_cld':atm_sw_crf_cld, 'sw_crf_cs':atm_sw_crf_cs, 'sw_crf_all':atm_sw_crf,
+                   'lw_crf_cld':atm_lw_crf_cld, 'lw_crf_cs':atm_lw_crf_cs, 'lw_crf_all':atm_lw_crf,
+                   'total': total_forcing}
+
+        return forcing
+
+    def atm_cs_forcing(self, data_all_sky, data_clear_sky):
+        # the clear sky fluxes are known (unlike the cloud fluxes above)
+        # so the clear sky forcing is the net flux (i.e. down - up) 
+
+        sw_crf_toa_cs  =     data_all_sky['swdt'] - data_clear_sky['swut'] #SWDT_all = SWDT_clear 
+        lw_crf_surf_cs =   data_clear_sky['lwds'] - data_clear_sky['lwus']
+        sw_crf_surf_cs =   data_clear_sky['swds'] - data_clear_sky['swus']
+        lw_crf_toa_cs  = - data_clear_sky['lwut']  #LWDT_cs = 0 (as does all-sky)
+
+        cs_forcing = {'sw_toa':sw_crf_toa_cs,   'lw_toa':lw_crf_toa_cs, 
+                     'sw_surf':sw_crf_surf_cs, 'lw_surf':lw_crf_surf_cs}
+
+        return cs_forcing
+
     def global_avg_cre(self, cre, lat):
 
         global_cre = {}
