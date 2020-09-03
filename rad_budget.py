@@ -96,7 +96,7 @@ class EnergyBudget():
                1D array of shate latitude 
         Returns
         -------
-        output : a dictionary with keys: lwc, swa, pl
+        output : a dictionary with keys: lwc, swa
 
         """
 
@@ -117,7 +117,7 @@ class EnergyBudget():
                            + area_weight_avg(data['swdt'],data['lat'], lat_axis=0)
                            - area_weight_avg(data['swut'],data['lat'], lat_axis=0) )
 
-        output = {'lwc':lwc, 'swa':swa, 'pl':data['p'], 'sh':data['sh']}  
+        output = {'lwc':lwc, 'swa':swa}
 
         return output 
 
@@ -180,39 +180,11 @@ class EnergyBudget():
 
         return output
 
-    def total_atmos_forcing(self, data_all_sky, data_clear_sky, data_budget):    
-
-        # get the cloud forcing
-        cre_output = self.compute_cre(data_all_sky, data_clear_sky)
-
-        #get the clear sky forcing
-        cs_forcing =  atm_cs_forcing(self, data_all_sky, data_clear_sky)
-
-        #atmos forcing = toa forcing - surface forcing
-        atm_sw_crf_cld = output['swcre'] - output['swcre_surf']
-        atm_sw_crf_cs  = cs_forcing['swcre'] - cs_forcing['swcre_surf']
-        #atmospheric all sky sw forcing
-        atm_sw_crf     = atm_sw_crf_cld + atm_sw_crf_cs
-
-        atm_lw_crf_cld = output['lwcre'] - output['lwcre_surf']
-        atm_lw_crf_cs  = cs_forcing['lwcre'] - cs_forcing['lwcre_surf']
-        #atmospheric all sky lw forcing
-        atm_lw_crf     = atm_lw_crf_cld + atm_lw_crf_cs 
-
-        #total = cre - cre_surf + PL + SH
-        total_forcing = cre_output['cre'] - cre_output['cre_surf'] + data['p'] + data['sh']
-
-        forcing = {'sw_crf_cld':atm_sw_crf_cld, 'sw_crf_cs':atm_sw_crf_cs, 'sw_crf_all':atm_sw_crf,
-                   'lw_crf_cld':atm_lw_crf_cld, 'lw_crf_cs':atm_lw_crf_cs, 'lw_crf_all':atm_lw_crf,
-                   'total': total_forcing}
-
-        return forcing
-
     def atm_cs_forcing(self, data_all_sky, data_clear_sky):
         # the clear sky fluxes are known (unlike the cloud fluxes above)
         # so the clear sky forcing is the net flux (i.e. down - up) 
 
-        sw_crf_toa_cs  =     data_all_sky['swdt'] - data_clear_sky['swut'] #SWDT_all = SWDT_clear 
+        sw_crf_toa_cs  =   data_clear_sky['swdt'] - data_clear_sky['swut'] 
         lw_crf_surf_cs =   data_clear_sky['lwds'] - data_clear_sky['lwus']
         sw_crf_surf_cs =   data_clear_sky['swds'] - data_clear_sky['swus']
         lw_crf_toa_cs  = - data_clear_sky['lwut']  #LWDT_cs = 0 (as does all-sky)
@@ -221,6 +193,35 @@ class EnergyBudget():
                      'sw_surf':sw_crf_surf_cs, 'lw_surf':lw_crf_surf_cs}
 
         return cs_forcing
+
+    def total_atmos_forcing(self, data_all_sky, data_clear_sky, data_budget):    
+
+        # get the cloud forcing
+        cre_output = self.compute_cre(data_all_sky, data_clear_sky)
+
+        #get the clear sky forcing
+        cs_forcing =  self.atm_cs_forcing(data_all_sky, data_clear_sky)
+
+        #atmos sw forcing for clouds, clear sky and all sky
+        atm_sw_crf_cld = cre_output['swcre'] - cre_output['swcre_surf']
+        atm_sw_crf_cs  = cs_forcing['sw_toa'] - cs_forcing['sw_surf']
+        atm_sw_crf     = atm_sw_crf_cld + atm_sw_crf_cs
+
+        #atmos lw forcing for clouds, clear sky and all sky
+        atm_lw_crf_cld = cre_output['lwcre'] - cre_output['lwcre_surf']
+        atm_lw_crf_cs  = cs_forcing['lw_toa'] - cs_forcing['lw_surf']
+        atm_lw_crf     = atm_lw_crf_cld + atm_lw_crf_cs 
+
+        #total = cre - cre_surf + rain*Lv +snow*L_f + SH
+        total_forcing = ( cre_output['cre'] - cre_output['cre_surf'] + 
+                        data_budget['p'] + data_budget['sh'])
+
+        forcing = {'sw_crf_cld':atm_sw_crf_cld, 'sw_crf_cs':atm_sw_crf_cs, 
+                   'sw_crf_all':atm_sw_crf, 'lw_crf_cld':atm_lw_crf_cld, 
+                   'lw_crf_cs':atm_lw_crf_cs, 'lw_crf_all':atm_lw_crf,
+                   'total': total_forcing}
+
+        return forcing
 
     def global_avg_cre(self, cre, lat):
 
