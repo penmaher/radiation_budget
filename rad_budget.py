@@ -212,9 +212,8 @@ class EnergyBudget():
         atm_lw_crf_cs  = cs_forcing['lw_toa'] - cs_forcing['lw_surf']
         atm_lw_crf     = atm_lw_crf_cld + atm_lw_crf_cs 
 
-        #total = cre - cre_surf + rain*Lv +snow*L_f + SH
-        total_forcing = ( cre_output['cre'] - cre_output['cre_surf'] + 
-                        data_budget['p'] + data_budget['sh'])
+        total_forcing = ( atm_lw_crf +  atm_sw_crf +
+                          data_budget['p'] + data_budget['sh'])
 
         forcing = {'sw_crf_cld':atm_sw_crf_cld, 'sw_crf_cs':atm_sw_crf_cs, 
                    'sw_crf_all':atm_sw_crf, 'lw_crf_cld':atm_lw_crf_cld, 
@@ -240,14 +239,14 @@ class EnergyBudget():
 
         return glb_cre_comp
 
-    def global_atmos_budget(self, budget, lat):
-
-        global_budget = {}
-        for var in ['pl', 'lwc', 'swa', 'sh', 'net']:
-            global_budget[var] = calc_global_mean(budget[var], lat)
-            print('Global energy budget {} is: {:8.2f}'.format(var,global_budget[var]))
-
-        return global_budget
+#    def global_atmos_budget(self, budget, lat):
+#
+#        global_budget = {}
+#        for var in ['pl', 'lwc', 'swa', 'sh', 'net']:
+#            global_budget[var] = calc_global_mean(budget[var], lat)
+#            print('Global energy budget {} is: {:8.2f}'.format(var,global_budget[var]))
+#
+#        return global_budget
 
     def global_avg_flux_comp(self, data, lat):
 
