@@ -4,8 +4,16 @@ __author__ = 'Penelope Maher'
 
 class ComputeCloudRadiativeEffect():
 
-    def __init__(self, data_all_sky, data_cs):
+    def __init__(self, data):
         """ Initialize the labels for calculation.
+
+        Input
+        ----------------
+            data: is a dictionary that contain all-sky and clear-sky fluxes
+                  the keys names are assumed to be 
+                  ['swut', 'swdt', 'swus', 'swds', 'lwut','lwus','lwds',
+                   'swut_cs', 'swdt_cs', 'swus_cs', 'swds_cs', 'lwut_cs',
+                   'lwus_cs','lwds_cs']
 
         List of acronyms
         -----------------
@@ -32,10 +40,9 @@ class ComputeCloudRadiativeEffect():
 
         """
 
-        self.data_all = data_all_sky # a dictionary of all-sky flux arrays
-        self.data_cs  = data_cs      # a dictionary of clear-sky flux arrays
+        self.data = data
 
-        #cre terms
+        #cre terms that are calculated in this class
         self.lwcre = None
         self.swcre = None
         self.cre   = None
@@ -54,13 +61,11 @@ class ComputeCloudRadiativeEffect():
 
         Parameters needed
         ----------
-            self.data_all : dict of all-sky fluxes. Fluxes are assumed to be 1D
-                            and have the shape self.data['flux_name'][lat],
-                            i.e. they are time-mean zonal-mean flux.
-                            But the code will work on other shapped data.
+            self.data : Dict of all-sky and clear-sky fluxes. 
+                        Fluxes are assumed to be 1D and have the shape 
+                        self.data['flux_name'][lat], i.e. time-mean zonal-mean.
+                        But the code will work on other shapped data.
  
-            self.data_clear_sky : as above but for clear-sky fluxes
-
         Returns
         -------
                           : no returns
@@ -75,20 +80,20 @@ class ComputeCloudRadiativeEffect():
 
         Notes:
         -------
-          - cre, cre_surf, and acre can be validated against Allan 2011 Fig 5. (see ref above)
+          - cre, cre_surf, and acre can be validated against Allan 2011 Fig 5.
 
         """
 
         #TOA CRE all sky
-        self.lwcre = self.data_cs['lwut'] - self.data['lwut']
-        self.swcre = self.data_cs['swut'] - self.data['swut']
+        self.lwcre = self.data['lwut_cs'] - self.data['lwut']
+        self.swcre = self.data['swut_cs'] - self.data['swut']
         self.cre  = self.lwcre + self.swcre 
 
         #surf CRE all sky
-        self.lwcre_surf = (self.data['lwds'] - self.data_cs['lwds'] 
-                          -self.data['lwus'] + self.data_cs['lwus']) 
-        self.swcre_surf = (self.data['swds'] - self.data_cs['swds'] 
-                          -self.data['swus'] + self.data_cs['swus'])
+        self.lwcre_surf = (self.data['lwds'] - self.data['lwds_cs'] 
+                          -self.data['lwus'] + self.data['lwus_cs']) 
+        self.swcre_surf = (self.data['swds'] - self.data['swds_cs'] 
+                          -self.data['swus'] + self.data['swus_cs'])
         self.cre_surf   = self.lwcre_surf + self.swcre_surf
 
         #atmospheric CRE all sky 
