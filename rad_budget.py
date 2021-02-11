@@ -3,11 +3,17 @@ import numpy as np
 import pdb
 
 from .global_mean import calc_global_mean
+from .cre import ComputeCloudRadiativeEffect
 
 __author__ = 'Penelope Maher'
 
 
-class AtmosEnergyBudget():
+#constants
+Lc =  2.50e6 #latent heat of condensation [J/kg]
+Lf =  3.34e5#latent heat of fusion [J/kg]
+sec_in_day = 60.*60.*24
+
+class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
 
     def __init__(self, data):
         """ Initialize the labels for the budget dictionary.
@@ -19,7 +25,7 @@ class AtmosEnergyBudget():
                 - sh
                 - lh 
                 - if lh is not provided: precipitation from rain P_r
-                                         and snow P_s is needed
+                                         and snow P_s is needed. Both in mm/day
 
         List of acronyms
         -----------------
@@ -45,7 +51,7 @@ class AtmosEnergyBudget():
                                        on Global-Mean Precipitation Change
         """
 
-
+        super(AtmosEnergyBudget, self).__init__(data)
 
         self.data     = data # a dictionary of all-sky flux arrays
         #self.lh       = lh           # lh = (L_f x snow + L_c x precip) in W/m2
@@ -65,55 +71,69 @@ class AtmosEnergyBudget():
         # net sw absorbed by atmosphere
         self.swa = (self.data['swdt'] - self.data['swut']) - (self.data['swds'] - self.data['swus']) 
 
-
     def compute_atmos_budget(self):
 
         self.compute_lwc()
         self.compute_swa()
 
-        self.net = - self.lwc + self.swa + self.lh + self.sh
+        #if 'lh' in self.data.keys():
+        self.lh = self.data['lh']
+
+        #elif ('rain' in self.data.keys()) and ('snow' in self.data.keys()):
+        #rain and snow are in mm/day.
+        #convert to kg/m2/3 then multiply by LH for W/m2
+
+        self.lh_p = ((self.data['rain']/sec_in_day)*Lc +
+                     (self.data['snow']/sec_in_day)*Lf)
+
+        self.net = - self.lwc + self.swa +self.data['sh'] + self.lh
+        self.net_p = - self.lwc + self.swa + self.data['sh'] + self.lh_p
 
     def atm_cs_forcing(self, data):
         # the clear sky fluxes are known (unlike the cloud fluxes above)
         # so the clear sky forcing is the net flux (i.e. down - up) 
 
-        sw_crf_toa_cs  =   data['swdt_cs'] - data['swut_cs'] 
-        lw_crf_surf_cs =   data['lwds_cs'] - data['lwus_cs']
-        sw_crf_surf_cs =   data['swds_cs'] - data['swus_cs']
-        lw_crf_toa_cs  = - data['lwut_cs']
+        self.sw_crf_toa_cs  =   data['swdt_cs'] - data['swut_cs'] 
+        self.lw_crf_surf_cs =   data['lwds_cs'] - data['lwus_cs']
+        self.sw_crf_surf_cs =   data['swds_cs'] - data['swus_cs']
+        self.lw_crf_toa_cs  = - data['lwut_cs']
 
-        cs_forcing = {'sw_toa':sw_crf_toa_cs,   'lw_toa':lw_crf_toa_cs, 
-                     'sw_surf':sw_crf_surf_cs, 'lw_surf':lw_crf_surf_cs}
+        #cs_forcing = {'sw_toa':sw_crf_toa_cs,   'lw_toa':lw_crf_toa_cs, 
+        #             'sw_surf':sw_crf_surf_cs, 'lw_surf':lw_crf_surf_cs}
 
-        return cs_forcing
+        #return cs_forcing
 
     def total_atmos_forcing(self, data):    
+        # there are all class attributes rather than variables passes out
+        # as it is common to want to plot the components and this is a cleaner
+        # way of passing out all the variables.
 
         # get the cloud forcing
-        cre_output = self.compute_cre(data)
+        self.compute_cre()
 
         #get the clear sky forcing
-        cs_forcing =  self.atm_cs_forcing(data)
-
+        self.atm_cs_forcing(data)
+        
         #atmos sw forcing for clouds, clear sky and all sky
-        atm_sw_crf_cld = cre_output['swcre'] - cre_output['swcre_surf']
-        atm_sw_crf_cs  = cs_forcing['sw_toa'] - cs_forcing['sw_surf']
-        atm_sw_crf     = atm_sw_crf_cld + atm_sw_crf_cs
+        self.atm_sw_crf_cld = self.swcre - self.swcre_surf
+        self.atm_sw_crf_cs  = self.sw_crf_toa_cs - self.sw_crf_surf_cs
+        self.atm_sw_crf     = self.atm_sw_crf_cld + self.atm_sw_crf_cs
 
         #atmos lw forcing for clouds, clear sky and all sky
-        atm_lw_crf_cld = cre_output['lwcre'] - cre_output['lwcre_surf']
-        atm_lw_crf_cs  = cs_forcing['lw_toa'] - cs_forcing['lw_surf']
-        atm_lw_crf     = atm_lw_crf_cld + atm_lw_crf_cs 
+        self.atm_lw_crf_cld = self.lwcre - self.lwcre_surf
+        self.atm_lw_crf_cs  = self.lw_crf_toa_cs - self.lw_crf_surf_cs
+        self.atm_lw_crf     = self.atm_lw_crf_cld + self.atm_lw_crf_cs 
 
-        total_forcing = ( atm_lw_crf +  atm_sw_crf +
-                          data['p'] + data['sh'])
+        self.total_forcing = ( self.atm_lw_crf +  self.atm_sw_crf +
+                          (data['precip']/sec_in_day)*Lc + data['sh'])
 
-        forcing = {'sw_crf_cld':atm_sw_crf_cld, 'sw_crf_cs':atm_sw_crf_cs, 
-                   'sw_crf_all':atm_sw_crf, 'lw_crf_cld':atm_lw_crf_cld, 
-                   'lw_crf_cs':atm_lw_crf_cs, 'lw_crf_all':atm_lw_crf,
-                   'total': total_forcing}
+        
+        #forcing = {'sw_crf_cld':atm_sw_crf_cld, 'sw_crf_cs':atm_sw_crf_cs, 
+        #           'sw_crf_all':atm_sw_crf, 'lw_crf_cld':atm_lw_crf_cld, 
+        #           'lw_crf_cs':atm_lw_crf_cs, 'lw_crf_all':atm_lw_crf,
+        #           'total': total_forcing}
 
-        return forcing
+        #return forcing
 
 
     def global_avg_flux_comp(self, data, lat):
