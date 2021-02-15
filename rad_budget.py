@@ -27,6 +27,13 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
                 - if lh is not provided: precipitation from rain P_r
                                          and snow P_s is needed. Both in mm/day
 
+        Code purpose
+        --------------
+            - self.compute_lwc() and compute_swa calculate the LWC and SWA
+            - there are two methods for calculating the atmospheric energy budget
+              Both methods are equivalent but use different was to express the
+              LW and SW all-ky atmospheric forcing.  
+
         List of acronyms
         -----------------
             lw: longwave
@@ -36,6 +43,8 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
             cs: clear-sky fluxes (if not cs then fluxes are all-sky)
             lh: latent heat
             sh: sensible heat
+           lwc: longwave cooling (positive -> cooling)
+           swa: shortwave absorption (positive -> heating)
 
         Units
         --------------
@@ -57,27 +66,63 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         #self.lh       = lh           # lh = (L_f x snow + L_c x precip) in W/m2
 
         #budget terms that are defined in this class
-        self.lwc = None
-        self.swa = None
-        self.net = None
+        self.lwc   = None
+        self.swa   = None
+        self.lh    = None
+        self.lh_p  = None  #LH computed using precip
+        self.net   = None  #budget residual
+        self.net_p = None  #budget residual computed using self.lh_p
+         
+        # Note that because this class inherits ComputeCloudRadiativeEffect, 
+        # all of the CRE variables are also available in this class.
+
+        #clear sky forcing
+        self.sw_crf_toa_cs  = None
+        self.lw_crf_surf_cs = None
+        self.sw_crf_surf_cs = None
+        self.lw_crf_toa_cs  = None
+
+        #atmos sw forcing
+        self.atm_sw_crf_cld = None
+        self.atm_sw_crf_cs  = None
+        self.atm_sw_crf     = None #swacre
+
+        # atmos lw forcing
+        self.atm_lw_crf_cld = None 
+        self.atm_lw_crf_cs  = None
+        self.atm_lw_crf     = None  
+
+        self.total_forcing  = None # budget residual 
+                         
+        #to keep track of what variables there are
+        self.var_list = ['lwc','swa','lh','lh_p','net','net_p',
+                         'sw_crf_toa_cs','lw_crf_surf_cs','sw_crf_surf_cs','lw_crf_toa_cs',
+                         'atm_sw_crf_cld','atm_sw_crf_cs','atm_sw_crf',
+                         'atm_lw_crf_cld','atm_lw_crf_cs','atm_lw_crf',
+                         'total_forcing']
+
+        # The data are managed as class attributes rather than variables passed
+        # out as it is common to plot the components and this is a cleaner
+        # way of passing out all the variables.
 
     def compute_lwc(self):
-        # long wave cooling : positive -> cooling.
         # net LW radiation lost to space
         self.lwc = self.data['lwut'] + (self.data['lwds'] - self.data['lwus'])      
 
     def compute_swa(self):
-        # short wave absorption : positive -> heating.
         # net sw absorbed by atmosphere
         self.swa = (self.data['swdt'] - self.data['swut']) - (self.data['swds'] - self.data['swus']) 
 
-    def compute_atmos_budget(self):
+    def atmos_budget_lwc_swa(self):
+        # Method 1 for computing the atmospheric energy budget: using LWC and SWA
 
         self.compute_lwc()
         self.compute_swa()
 
         #if 'lh' in self.data.keys():
         self.lh = self.data['lh']
+        self.sh = self.data['sh']
+
 
         #elif ('rain' in self.data.keys()) and ('snow' in self.data.keys()):
         #rain and snow are in mm/day.
@@ -86,8 +131,12 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         self.lh_p = ((self.data['rain']/sec_in_day)*Lc +
                      (self.data['snow']/sec_in_day)*Lf)
 
-        self.net = - self.lwc + self.swa +self.data['sh'] + self.lh
-        self.net_p = - self.lwc + self.swa + self.data['sh'] + self.lh_p
+        self.lh_p_only = (self.data['precip']/sec_in_day)*Lc
+
+
+        self.net = - self.lwc + self.swa +self.sh + self.lh
+        self.net_p = - self.lwc + self.swa + self.sh + self.lh_p
+        self.net_p_only = - self.lwc + self.swa + self.sh + self.lh_p_only
 
     def atm_cs_forcing(self, data):
         # the clear sky fluxes are known (unlike the cloud fluxes above)
@@ -98,15 +147,9 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         self.sw_crf_surf_cs =   data['swds_cs'] - data['swus_cs']
         self.lw_crf_toa_cs  = - data['lwut_cs']
 
-        #cs_forcing = {'sw_toa':sw_crf_toa_cs,   'lw_toa':lw_crf_toa_cs, 
-        #             'sw_surf':sw_crf_surf_cs, 'lw_surf':lw_crf_surf_cs}
-
-        #return cs_forcing
-
     def total_atmos_forcing(self, data):    
-        # there are all class attributes rather than variables passes out
-        # as it is common to want to plot the components and this is a cleaner
-        # way of passing out all the variables.
+        # Method 1 for computing the atmospheric energy budget: using 
+        # the cloudy and clear-sky forcing.
 
         # get the cloud forcing
         self.compute_cre()
@@ -123,18 +166,12 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         self.atm_lw_crf_cld = self.lwcre - self.lwcre_surf
         self.atm_lw_crf_cs  = self.lw_crf_toa_cs - self.lw_crf_surf_cs
         self.atm_lw_crf     = self.atm_lw_crf_cld + self.atm_lw_crf_cs 
+   
+        self.turb_flux      = self.lh_p + self.sh
 
-        self.total_forcing = ( self.atm_lw_crf +  self.atm_sw_crf +
-                          (data['precip']/sec_in_day)*Lc + data['sh'])
-
-        
-        #forcing = {'sw_crf_cld':atm_sw_crf_cld, 'sw_crf_cs':atm_sw_crf_cs, 
-        #           'sw_crf_all':atm_sw_crf, 'lw_crf_cld':atm_lw_crf_cld, 
-        #           'lw_crf_cs':atm_lw_crf_cs, 'lw_crf_all':atm_lw_crf,
-        #           'total': total_forcing}
-
-        #return forcing
-
+        self.total_forcing =  self.atm_lw_crf + self.atm_sw_crf + self.turb_flux
+        self.total_forcing_p_only =  self.atm_lw_crf + self.atm_sw_crf + self.lh_p_only + self.sh
+        self.total_forcing_p =  self.atm_lw_crf + self.atm_sw_crf + self.lh_p + self.sh
 
     def global_avg_flux_comp(self, data, lat):
 

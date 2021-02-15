@@ -55,6 +55,11 @@ class ComputeCloudRadiativeEffect():
         self.aswcre = None
         self.acre   = None
 
+        #to keep track of what variables there are
+        self.var_list = ['cre', 'lwcre', 'swcre',
+                         'cre_surf', 'lwcre_surf', 'swcre_surf',
+                         'acre', 'alwcre', 'aswcre']
+
     def compute_cre(self):
         """
         Compute the cloud radiative effect
