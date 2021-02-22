@@ -11,8 +11,7 @@ __author__ = 'Penelope Maher'
 #constants
 Lc =  2.50e6  #latent heat of condensation [J/kg]
 Lf =  3.34e5  #latent heat of fusion [J/kg]
-Ls =  2.848e6 #latent heat of fusion [J/kg]
-
+Ls =  2.834e6 #latent heat of fusion [J/kg]
 sec_in_day = 60.*60.*24
 
 class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
@@ -150,7 +149,7 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         self.lh_p_only = (self.data['precip']/sec_in_day)*Lc
         self.net_p_only = - self.lwc + self.swa + self.sh + self.lh_p_only
 
-        #LH = Rain*Lc + Snow * Ls
+        #LH = Rain*Lc + Snow * Ls or equivalently LH = P*Lc + Snow * Lf
         self.lh_p = ((self.data['rain']/sec_in_day)*Lc +
                      (self.data['snow']/sec_in_day)*Ls)
         self.net_p = - self.lwc + self.swa + self.sh + self.lh_p
@@ -158,6 +157,10 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         #LH = E*Lc
         self.lh_e = (self.data['evap']/sec_in_day)*Lc
         self.net_e = - self.lwc + self.swa + self.sh + self.lh_e
+
+        #consider P-E
+        self.lh_p_only_min_e = self.lh_p_only + self.lh_e
+        self.lh_p_min_e = self.lh_p + self.lh_e
 
     def atm_cs_forcing(self):
         # the clear sky fluxes are known (unlike the cloud fluxes above)
@@ -169,7 +172,7 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         self.lw_crf_toa_cs  = -self.data['lwut_cs']
 
     def total_atmos_forcing(self):    
-        # Method 1 for computing the atmospheric energy budget: using 
+        # Method 2 for computing the atmospheric energy budget: using 
         # the cloudy and clear-sky forcing.
 
         # get the cloud forcing
@@ -188,9 +191,12 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         self.atm_lw_crf_cs  = self.lw_crf_toa_cs - self.lw_crf_surf_cs
         self.atm_lw_crf     = self.atm_lw_crf_cld + self.atm_lw_crf_cs 
    
-        self.turb_flux      = self.lh_p + self.sh
+        self.turb_flux      = self.lh + self.sh
 
         self.total_forcing =  self.atm_lw_crf + self.atm_sw_crf + self.turb_flux
+
+    def total_atmos_forcing_testing(self):
+
         self.total_forcing_p_only =  self.atm_lw_crf + self.atm_sw_crf + self.lh_p_only + self.sh
         self.total_forcing_p =  self.atm_lw_crf + self.atm_sw_crf + self.lh_p + self.sh
 
