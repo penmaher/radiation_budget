@@ -9,8 +9,10 @@ __author__ = 'Penelope Maher'
 
 
 #constants
-Lc =  2.50e6 #latent heat of condensation [J/kg]
-Lf =  3.34e5#latent heat of fusion [J/kg]
+Lc =  2.50e6  #latent heat of condensation [J/kg]
+Lf =  3.34e5  #latent heat of fusion [J/kg]
+Ls =  2.848e6 #latent heat of fusion [J/kg]
+
 sec_in_day = 60.*60.*24
 
 class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
@@ -119,35 +121,54 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         self.compute_lwc()
         self.compute_swa()
 
-        #if 'lh' in self.data.keys():
-        self.lh = self.data['lh']
         self.sh = self.data['sh']
 
-
-        #elif ('rain' in self.data.keys()) and ('snow' in self.data.keys()):
         #rain and snow are in mm/day.
-        #convert to kg/m2/3 then multiply by LH for W/m2
+        #convert to kg/m2/3 then multiply by LH constant for W/m2
 
-        self.lh_p = ((self.data['rain']/sec_in_day)*Lc +
-                     (self.data['snow']/sec_in_day)*Lf)
-
-        self.lh_p_only = (self.data['precip']/sec_in_day)*Lc
-
+        if 'rain' in self.data.keys() and 'snow' in self.data.keys(): 
+            self.lh = ((self.data['rain']/sec_in_day)*Lc +
+                       (self.data['snow']/sec_in_day)*Ls)
+        elif 'precip' in self.data.keys():
+            self.lh = (self.data['precip']/sec_in_day)*Lc
+        else:
+            print('Precip, rain and snow are now found. Need LH term.')
+            pdb.set_trace()
 
         self.net = - self.lwc + self.swa +self.sh + self.lh
-        self.net_p = - self.lwc + self.swa + self.sh + self.lh_p
+
+    def atmos_budget_testing(self):
+        # This code is only for testing the impact of using LH as precip total,
+        # its components, model output or evaporation
+
+        #LH is from model output
+
+        self.lh_model = self.data['lh']
+        self.net_lh_model = - self.lwc + self.swa + self.sh + self.lh_model
+
+        #LH = P*Lc
+        self.lh_p_only = (self.data['precip']/sec_in_day)*Lc
         self.net_p_only = - self.lwc + self.swa + self.sh + self.lh_p_only
 
-    def atm_cs_forcing(self, data):
+        #LH = Rain*Lc + Snow * Ls
+        self.lh_p = ((self.data['rain']/sec_in_day)*Lc +
+                     (self.data['snow']/sec_in_day)*Ls)
+        self.net_p = - self.lwc + self.swa + self.sh + self.lh_p
+
+        #LH = E*Lc
+        self.lh_e = (self.data['evap']/sec_in_day)*Lc
+        self.net_e = - self.lwc + self.swa + self.sh + self.lh_e
+
+    def atm_cs_forcing(self):
         # the clear sky fluxes are known (unlike the cloud fluxes above)
         # so the clear sky forcing is the net flux (i.e. down - up) 
 
-        self.sw_crf_toa_cs  =   data['swdt_cs'] - data['swut_cs'] 
-        self.lw_crf_surf_cs =   data['lwds_cs'] - data['lwus_cs']
-        self.sw_crf_surf_cs =   data['swds_cs'] - data['swus_cs']
-        self.lw_crf_toa_cs  = - data['lwut_cs']
+        self.sw_crf_toa_cs  =  self.data['swdt_cs'] - self.data['swut_cs'] 
+        self.lw_crf_surf_cs =  self.data['lwds_cs'] - self.data['lwus_cs']
+        self.sw_crf_surf_cs =  self.data['swds_cs'] - self.data['swus_cs']
+        self.lw_crf_toa_cs  = -self.data['lwut_cs']
 
-    def total_atmos_forcing(self, data):    
+    def total_atmos_forcing(self):    
         # Method 1 for computing the atmospheric energy budget: using 
         # the cloudy and clear-sky forcing.
 
@@ -155,7 +176,7 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         self.compute_cre()
 
         #get the clear sky forcing
-        self.atm_cs_forcing(data)
+        self.atm_cs_forcing()
         
         #atmos sw forcing for clouds, clear sky and all sky
         self.atm_sw_crf_cld = self.swcre - self.swcre_surf
