@@ -16,7 +16,7 @@ sec_in_day = 60.*60.*24
 
 class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
 
-    def __init__(self, data):
+    def __init__(self, data, lh_flag=False):
         """ Initialize the labels for the budget dictionary.
 
         Input
@@ -66,6 +66,8 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         self.data     = data # a dictionary of all-sky flux arrays
         #self.lh       = lh           # lh = (L_f x snow + L_c x precip) in W/m2
 
+        self.lh_flag = lh_flag #true if using LH output directly
+
         #budget terms that are defined in this class
         self.lwc   = None
         self.swa   = None
@@ -102,11 +104,14 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
                          'atm_lw_crf_cld','atm_lw_crf_cs','atm_lw_crf',
                          'total_forcing']
 
+        self.var_list_lwc_swa_budget = ['lwc','swa','lh','net','sh']
+
         # The data are managed as class attributes rather than variables passed
         # out as it is common to plot the components and this is a cleaner
         # way of passing out all the variables.
 
     def compute_lwc(self):
+
         # net LW radiation lost to space
         self.lwc = self.data['lwut'] + (self.data['lwds'] - self.data['lwus'])      
 
@@ -125,14 +130,26 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
         #rain and snow are in mm/day.
         #convert to kg/m2/3 then multiply by LH constant for W/m2
 
-        if 'rain' in self.data.keys() and 'snow' in self.data.keys(): 
-            self.lh = ((self.data['rain']/sec_in_day)*Lc +
-                       (self.data['snow']/sec_in_day)*Ls)
-        elif 'precip' in self.data.keys():
-            self.lh = (self.data['precip']/sec_in_day)*Lc
+        if self.lh_flag:
+            print('Using LH from model output')
+            self.lh = self.data['lh_flux']
         else:
-            print('Precip, rain and snow are now found. Need LH term.')
-            pdb.set_trace()
+            #compute LH from precipitation data
+            if 'snow' in self.data.keys():
+                if 'rain' in self.data.keys(): 
+                    print('LH was computed using rain and snow')
+                    self.lh = ((self.data['rain']/sec_in_day)*Lc +
+                               (self.data['snow']/sec_in_day)*Ls)
+                else: 
+                    print('LH was computed using precip and snow')
+                    self.lh = ((self.data['precip']/sec_in_day)*Lc +
+                               (self.data['snow']/sec_in_day)*Lf)
+            elif 'precip' in self.data.keys():
+                print('LH was computed using precip only')
+                self.lh = (self.data['precip']/sec_in_day)*Lc
+            else:
+                print('Precip, rain and snow are now found. Need LH term.')
+                pdb.set_trace()
 
         self.net = - self.lwc + self.swa +self.sh + self.lh
 
