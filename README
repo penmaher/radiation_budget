@@ -3,9 +3,28 @@ used in this code.
 
 See the blog here http://www.penelopemaher.com/blogs/blog_cre.html
 
+The code was forked from GitHub at  https://github.com/penmaher/radiation_budget
+
 See LICENSE for more information about how this code can be used.
 
 If you find an error, or would simply like to tell me found the code useful 
 then contact me via email which can be found on the contact page of my website
 
 http://www.penelopemaher.com/contact.html
+
+Here is a brief summary of what the code does:
+
+cre.py
+    - find the area weighted global mean
+    - some quick and dirty options for plotting area weighted values
+
+global_mean.py
+    - The class ComputeCloudRadiativeEffect has a method function to compute the 
+      Cloud Radiative Effect (CRE)
+
+rad_budget.py
+    - The class AtmosEnergyBudget has two methods for computing the atmospheric
+      energy budget. Option one is use the longwave cooling and shortwave
+      absorption. Option two is to compute the total forcing using the cloud
+      and clear sky forcing. See the blog link above for further details.
+   -  This file still retains testing I was doing to validate the methods. 
