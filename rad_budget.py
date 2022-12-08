@@ -14,19 +14,23 @@ Lf =  3.34e5  #latent heat of fusion [J/kg]
 Ls =  2.834e6 #latent heat of fusion [J/kg]
 sec_in_day = 60.*60.*24
 
+flux_names       = ['lwut',    'lwus',    'lwds',    'swut',    'swdt',    'swus',    'swds']
+flux_names_cs    = ['lwut_cs', 'lwus_cs', 'lwds_cs', 'swut_cs', 'swdt_cs', 'swus_cs', 'swds_cs']
+extra_budget_lh  = ['sh','lh']            # if LH is used directly
+extra_budget     = ['sh','precip','snow'] # if LH is computed
+
 class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
 
     def __init__(self, data, lh_flag=False):
+
         """ Initialize the labels for the budget dictionary.
 
         Input
         -----------------
             data is a dictionary with the following keys:
-                - all-sky fluxes: swut, swdt, swus, swds, lwut, lwus, lwds
+                - all-sky fluxes: as in flux_names and flux_names_cs
                 - sh
-                - lh 
-                - if lh is not provided: precipitation from rain P_r
-                                         and snow P_s is needed. Both in mm/day
+                - lh (W/m2) or alternatively snow and rain (mm/day)
 
         Code purpose
         --------------
@@ -59,20 +63,45 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
                                        on hydrologic cycle intensification
                 Pendergrass and Hartmann 2013: The Atmospheric Energy Constraint
                                        on Global-Mean Precipitation Change
+        How is LH computed?
+        --------------
+            
+            The code can recieve LH as a model ouput. 
+
+            The code can also compute LH (preferred) where:
+                LH = L_f x snow + L_c x precip in W/m2. 
+                This method requires additional data for snow and precip.
+
+            Either method is fine from a global budget perspective, but there
+                will be differences in latitude. For example, the Met Office Unified
+                Model uses evaporation to compute LH which is different to LH
+                computed using precip and snow.
+
+        Two methods for computing the budget
+        --------------
+            Method 1: uses LWC and SWA (preferred). Advantage that it does not require 
+                      the clear-sky forcing
+    
+            Method 2: uses cloudy and clear-sky forcing. Advantage you can explore
+                      more componenets of the budget
+
+            The methods are equivalent in terms of looking at the budget residual.
+
         """
 
         super(AtmosEnergyBudget, self).__init__(data)
 
-        self.data     = data # a dictionary of all-sky flux arrays
-        #self.lh       = lh           # lh = (L_f x snow + L_c x precip) in W/m2
+        # a dictionary of all-sky flux arrays
+        self.data     = data 
 
-        self.lh_flag = lh_flag #true if using LH output directly
+        #true if using LH output directly
+        self.lh_flag = lh_flag 
 
         #budget terms that are defined in this class
         self.lwc   = None
         self.swa   = None
-        self.lh    = None
-        self.lh_p  = None  #LH computed using precip
+        self.lh    = None 
+        self.lh_p  = None  #LH computed using precip (if using)
         self.net   = None  #budget residual
         self.net_p = None  #budget residual computed using self.lh_p
          
@@ -220,7 +249,7 @@ class AtmosEnergyBudget(ComputeCloudRadiativeEffect):
     def global_avg_flux_comp(self, data, lat):
 
         global_flux_comp = {}
-        for var in ['lwut', 'lwus', 'lwds', 'swut', 'swdt', 'swus', 'swds']:
+        for var in flux_names:
             global_flux_comp[var] = calc_global_mean(data[var], lat)
 
         return global_flux_comp

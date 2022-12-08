@@ -1,4 +1,5 @@
 from .global_mean import calc_global_mean
+import numpy as np
 
 __author__ = 'Penelope Maher'
 
@@ -108,11 +109,9 @@ class ComputeCloudRadiativeEffect():
 
     def global_avg_cre(self, lat):
         # returns the global mean 
-        global_cre = {}
-        for var in self.cre.keys():
-            global_cre[var] = calc_global_mean(self.cre[var], lat)    
-            print('Global CRE for {} is: {:8.2f}'.format(var,global_cre[var]))
-        
+        cre_tm_zm = np.mean(self.cre,axis=(0,-1)) 
+        global_cre = calc_global_mean(cre_tm_zm, lat)    
+        print('Global CRE is: {:8.2f}'.format(global_cre))       
         return global_cre
 
 
